@@ -46,3 +46,40 @@ You will need a RISC-V "newlib" tool chain from
 https://github.com/riscv/riscv-gnu-toolchain, and qemu compiled for
 riscv64-softmmu.  Once they are installed, and in your shell
 search path, you can run "make qemu".
+
+# Change 1 - Aniruddh's Implementation
+Defined PTE_A (Accessed, 1L << 6) and PTE_D (Dirty, 1L << 7). These are native RISC-V hardware bits set by the MMU, essential for accurate page replacement algorithms.
+
+## proc.h & proc.c
+Reverse Map Head (proc.h): Added int rmap_head; to struct proc. This acts as the head of a doubly-linked list for the process's allocated physical frames, ensuring O(1) reverse-mapping without relying on a slow global lookup array.
+
+Process Initialization (proc.c): Updated allocproc() to initialize p->rmap_head = -1 when a process is created.
+
+Fork Integration (proc.c): Updated the kfork() call to uvmcopy() to pass the newly allocated child process (np), ensuring child pages are linked to the child's reverse map, not the parent's.
+
+## kalloc.c (The Global Core Map)
+Frame Table Definition: Introduced struct frame frame_table[PHYSTOP / PGSIZE] to track the metadata of every physical frame.
+
+Fields include: state (0=free, 1=pinned/kernel, 2=user/pageable), owner (pointer to struct proc), va (virtual address), and doubly-linked list pointers (next, prev).
+
+Locking & State: Added struct spinlock ft_lock to protect the frame table and int clock_hand for the replacement algorithm.
+
+kinit(): Modified to initialize the entire frame table as "pinned" (state = 1) by default, securing kernel memory upon boot.
+
+kalloc() & kfree(): * kalloc() allocates pages securely as pinned.
+
+kfree() safely severs the frame from the owning process's reverse map linked list, resetting all tracking metadata.
+
+kalloc_user_map(): Added to explicitly transition a pinned page into a pageable user page (state = 2) and stitch it into the owning process's rmap_head linked list.
+
+pick_victim(): Implemented the Clock Page Replacement algorithm. It uses a two-pass circular scan over the frame table, checking the hardware PTE_A bit. If set, it clears the bit (giving a second chance). If clear, it returns the frame's physical address for eviction.
+
+## vm.c
+Memory Allocation Tracking (uvmalloc): Added logic to retrieve the current process (myproc()) and register newly allocated pages to the user via kalloc_user_map().
+
+Fork Tracking (uvmcopy): Modified signature to accept the new_proc pointer. Maps newly duplicated physical pages to the child process's frame table metadata.
+
+Lazy Allocation Tracking (vmfault): Added kalloc_user_map() calls directly into the page fault handler so lazily allocated user pages are correctly registered into the reverse map.
+
+## defs.h
+Updated kernel-wide function signatures to expose kalloc_user_map, pick_victim, and the updated uvmcopy.
