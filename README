@@ -47,6 +47,9 @@ https://github.com/riscv/riscv-gnu-toolchain, and qemu compiled for
 riscv64-softmmu.  Once they are installed, and in your shell
 search path, you can run "make qemu".
 
+Necessary system library installation:
+sudo dnf install git @development-tools gdb qemu-system-riscv gcc-riscv64-linux-gnu binutils-riscv64-linux-gnu
+
 # Change 1 - Aniruddh's Implementation
 Defined PTE_A (Accessed, 1L << 6) and PTE_D (Dirty, 1L << 7). These are native RISC-V hardware bits set by the MMU, essential for accurate page replacement algorithms.
 
