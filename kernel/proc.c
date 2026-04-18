@@ -143,6 +143,12 @@ found:
     p->context.ra = (uint64)forkret;
     p->context.sp = p->kstack + PGSIZE;
 
+    // Initialize swap tracking
+    p->num_swapped = 0;
+    for(int i = 0; i < 16; i++)
+        p->swap_slots[i] = -1;  // -1 means empty slot
+    initlock(&p->swap_lock, "swap_lock");
+
     return p;
 }
 

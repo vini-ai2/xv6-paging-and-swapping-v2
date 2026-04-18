@@ -7,6 +7,7 @@
 #include "proc.h"
 #include "fs.h"
 #include "defs.h"
+#include "swap.h"
 
 /*
  * the kernel's page table.
@@ -476,4 +477,35 @@ int ismapped(pagetable_t pagetable, uint64 va)
         return 1;
     }
     return 0;
+}
+
+// Check if a page table entry points to a swapped-out page
+int
+is_swapped_out(pte_t *pte)
+{
+  if(pte == 0) return 0;
+  return (*pte & PTE_SWAP) != 0;
+}
+
+// Mark a page as swapped out and store the swap slot number in the PTE
+void
+mark_swapped_out(pagetable_t pagetable, uint64 va, int swap_slot)
+{
+  pte_t *pte = walk(pagetable, va, 0);
+  if(pte == 0)
+    panic("mark_swapped_out: no pte");
+  
+  // Clear valid bit, set swap bit
+  *pte = (*pte & ~PTE_V) | PTE_SWAP;
+  // Store swap slot in upper bits (shifted left 10 bits)
+  *pte |= ((uint64)swap_slot << 10);
+}
+
+// Extract the swap slot number from a PTE that has PTE_SWAP set
+int
+get_swap_slot_from_pte(pte_t *pte)
+{
+  if(pte == 0 || !(*pte & PTE_SWAP))
+    return -1;
+  return (*pte >> 10) & 0x3FFFFFFFFF;
 }

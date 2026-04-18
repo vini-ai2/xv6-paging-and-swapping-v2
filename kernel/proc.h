@@ -110,4 +110,8 @@ struct proc {
     struct inode* cwd; // Current directory
     char name[16]; // Process name (debugging)
     int rmap_head; // Head of process's reverse map list (frame table index)
+
+    int swap_slots[16];           // Stores swap slot numbers (max 16 swapped pages)
+    int num_swapped;              // How many pages currently swapped out
+    struct spinlock swap_lock;    // Lock to protect swap operations
 };
